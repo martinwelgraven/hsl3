@@ -35,8 +35,13 @@ class Hsl3WrapperModule():
         self.node.fw.hs_on_input(key, value.encode('iso-8859-15') if isinstance(value, str) else value)
         self.node.on_calc(self.node.fw.inputs) 
 
-
-
+    def get_output_value(self, key):
+        """
+            Function to mock the call from the HomeServer object to the logic node.
+            Retrieves the output value from the context of the node.
+        """
+        return self.node.fw.outputs.get(key)
+        
     def _open_config(self, source_file) -> ConfigModule:
         """ Helper function to open the config file and parse it into a ConfigModule object. """
 
