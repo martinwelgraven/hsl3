@@ -48,6 +48,7 @@ class Hsl3Slots:
 
             slot.data_type = data_type.lower()
             slot.value = init_slot.init_value
+            slot._changed = False
         
         if init_slot.identifier:
             self._slots_by_key[str(init_slot.identifier.upper())] = slot

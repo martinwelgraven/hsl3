@@ -33,7 +33,7 @@ class Hsl3WrapperModule():
             Sets the input value in the context of the node and triggers the on_calc method of the node.
         """
         self.node.fw.hs_on_input(key, value.encode('iso-8859-15') if isinstance(value, str) else value)
-        self.node.on_calc(self.node.fw.inputs) 
+        self.node.on_calc(self.node.fw.inputs)
 
     def get_output_value(self, key):
         """
