@@ -22,22 +22,24 @@ class Hsl3Framework:
         self.outputs: Hsl3Slots
         self.timers: Hsl3Slots
 
-        self.timer_callback: Union[Callable[..., object], None] = None
         self.config: Union[ConfigModule, None] = None
 
-    def hs_set_timer_callback(self, callback: Callable[..., object]):
+        self.timer_callback: Union[Callable[[Hsl3Slots], None], None] = None
+        self.active_timers: dict[str, threading.Timer] = {}
+
+    def hs_set_timer_callback(self, callback: Callable[[Hsl3Slots], None]):
         """ Called on load of the Logic Node and sets a reference to the on_timer callback function for timers. """
         self.timer_callback = callback
 
-    def hs_set_slots(self, inputs, stores, outputs, timers):
+    def hs_set_slots(self, inputs: Hsl3Slots, stores: Hsl3Slots, outputs: Hsl3Slots, timers: Hsl3Slots):
         """ Set the slots for inputs, stores, outputs, and timers. """
         self.inputs = inputs
         self.stores = stores
         self.outputs = outputs
         self.timers = timers
     
-    def hs_on_input(self, index_or_key, value):
-        """ Called by the HomeServer/FS system when an input value is received. """
+    def hs_on_input(self, index_or_key: Union[str, int], value: Union[float, int, bytes]):
+        """ Called by the HomeServer/FS system when an input value is received. """    
         if index_or_key in self.inputs.keys():
             self.inputs.get(index_or_key).value = value
         elif index_or_key in self.stores.keys():
@@ -68,7 +70,7 @@ class Hsl3Framework:
         print(f"Running in context: {callback.__name__} with params: {params}")
         callback(*params)
     
-    def set_output(self, index_or_key, value):
+    def set_output(self, index_or_key: Union[str, int], value: Union[float, int, bytes]):
         """Set an output value in the HSL3 context.
 
         Sets the specified output to the transferred value. May only be called in the context of the node. If the method is called in a different context/thread, an exception is triggered.
@@ -97,9 +99,9 @@ class Hsl3Framework:
         else:
             display=value
         
-        print(f"Output set: {index_or_key} = {display}")
+        #print(f"Output set: {index_or_key} = {display}")
     
-    def set_store(self, index_or_key, value):
+    def set_store(self, index_or_key: Union[str, int], value: Union[float, int, bytes]):
         """Set a store value in the HSL3 context.
         Sets the specified memory variable to the transferred value. May only be called in the context of the node.
         
@@ -117,10 +119,10 @@ class Hsl3Framework:
             display = value.decode("iso-8859-15")
         else:
             display = value
-        print(f"Store set: {index_or_key} = {display}")
+        # print(f"Store set: {index_or_key} = {display}")
 
 
-    def set_timer(self, index_or_key, seconds):
+    def set_timer(self, index_or_key: Union[str, int], seconds: Union[int, None]):
         """Set a timer in the HSL3 context.
         Sets a timer with the specified index or key to the transferred time. May only be called in the context of the node.
         
@@ -131,16 +133,36 @@ class Hsl3Framework:
         Exceptions:
          - If the method is not called from the thread of the context, an exception of type Hsl3ContextError is triggered.
         """
+        
         def timer_thread():
-            threading.Timer(seconds, self.stop_timer, args=(index_or_key,)).start()
+            print(f"Starting timer thread for: {index_or_key} with {seconds} seconds")
+            self.active_timers[str(index_or_key)] = threading.Timer(seconds if seconds is not None else 0, self.hs_timer_callback, args=(index_or_key,))
+            self.active_timers[str(index_or_key)].start()
             self.timers.get(index_or_key).value = seconds
+            self.timers.get(index_or_key)._changed = False
 
-        timer_thread()
-        print(f"Timer set: {index_or_key} = {seconds} seconds")
+        if index_or_key not in self.timers.keys():
+            raise ValueError(f"Timer with index or key '{index_or_key}' does not exist.")
+
+        if seconds is not None and seconds < 0:
+            raise ValueError(f"Invalid timer value: {seconds}")
+
+        if seconds is None or seconds == 0:
+            self.hs_timer_callback(index_or_key, True)
+            return
+
+        active_timer = self.active_timers.get(str(index_or_key))
+        if active_timer:
+            print(f"Cancelling timer thread for: {index_or_key}")
+            active_timer.cancel()
+
+        if seconds is not None and seconds > 0:
+            timer_thread()
+        # print(f"Timer set: {index_or_key} = {seconds} seconds")
     
-    def stop_timer(self, index_or_key):
+    def hs_timer_callback(self, index_or_key, stop=False):
         """Stop a timer in the HSL3 context.
-        Stops the timer with the specified index or key. May only be called in the context of the node.
+        Is called when a timer with the specified index or key expires. Then triggers the node callback if it is set.
         
         Parameters:
          - index_or_key - Index or key of the timer. If the index or key does not exist, an exception is triggered.
@@ -149,11 +171,17 @@ class Hsl3Framework:
          - If the method is not called from the thread of the context, an exception of type Hsl3ContextError is triggered.
         """
         if index_or_key in self.timers.keys():
-            if self.timer_callback is not None:
-                self.timers.get(index_or_key).value = 0
+            if index_or_key in self.active_timers.keys():
+                active_timer = self.active_timers.get(index_or_key)
+                if active_timer:
+                    print(f"Cancelling timer thread for: {index_or_key}")
+                    active_timer.cancel()
+                del self.active_timers[str(index_or_key)]
+
+            self.timers.get(index_or_key).value =0
+            
+            if self.timer_callback and not stop:
                 self.timer_callback(self.timers)
-            else:
-                print(f"Timer stopped: {index_or_key}")
         else:
             raise ValueError(f"Timer with index or key '{index_or_key}' does not exist.")
 

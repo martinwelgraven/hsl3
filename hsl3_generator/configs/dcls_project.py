@@ -141,7 +141,7 @@ class ConfigProject:
             print(f"Root directory '{self.root}' could not be validated.")
             exit()
 
-        self._src_folder = os.path.join(self.root, 'src')
+        self._src_folder = os.path.join(self.root, 'src', os.path.basename(os.path.normpath(self.root)))
         self._tests_folder = os.path.join(self.root, 'tests')
         self._initialize()
     
