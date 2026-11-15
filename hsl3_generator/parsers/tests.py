@@ -5,8 +5,19 @@ from hsl3.hsl3_generator.configs.dcls_module import ConfigModule
 
 class TestfileParser:
 
-    def __init__(self, test_file: str, json_file: str, config_node: ConfigModule):
-        
+    def __init__(self, root_path: str, json_file: str, config_node: ConfigModule):
+
+        test_folder = os.path.join(root_path, 'tests')
+        if not os.path.exists(test_folder):
+            os.mkdir(test_folder)
+
+        test_file = os.path.join(test_folder, f'test_{config_node.title.lower().replace(" ", "_")}.py')
+        if os.path.exists(test_file):
+            user_input = input(f"Test file for {config_node.title} already exists. Do you want to overwrite it? (y/n): ")
+            if user_input.lower() != 'y':
+                print("Aborting test file creation.")
+                return
+
         self.json_file = json_file
         self.config = config_node
         file_content = self._test_filecontent()
@@ -29,9 +40,9 @@ class TestfileParser:
         file_content += f"if os.path.join(ROOT_DIR, \"src\") not in sys.path:\n"
         file_content += f"\tsys.path.insert(0, os.path.join(ROOT_DIR, \"src\"))\n"
         file_content += "\n"
-        file_content += "from hsl3.hsl3 import Hsl3Framework\n"
-        file_content += "from hsl3.hsl3_wrapper import Hsl3WrapperModule\n"
-        file_content += f"from src.{str(self.config.scripts[0].filename).replace('.py', '')} import LogicModule\n"
+        file_content += "from hsl3.hsl3 import HSL3\n"
+        file_content += "from hsl3.hsl3_wrapper import Hsl3WrapperNode\n"
+        file_content += f"from {str(self.config.scripts[0].filename).replace('.py', '')} import LogicModule\n"
         file_content += "\n"
         file_content += f"json_file = \"{self.json_file}\"\n"
         file_content += "\n"
@@ -45,11 +56,11 @@ class TestfileParser:
         file_content += f"\tprint(\" === Starting test for {self.config.title} === \")\n"
         file_content += "\tprint(\"\")\n"
         file_content += "\n"
-        file_content += f"\thsl3 = Hsl3Framework(\"{ str(self.config.hsl_filename).replace('.hsl', '') }\")\n"
+        file_content += f"\thsl3 = HSL3(\"{ str(self.config.hsl_filename).replace('.hsl', '') }\")\n"
         file_content += "\tlogic_module = LogicModule(hsl3)\n"
-        file_content += f"\twrapper_node = Hsl3WrapperModule(os.path.join(ROOT_DIR, 'src', json_file), logic_module)  # type: ignore\n"
-        file_content += "\tif (wrapper_node.config is not None):\n"
-        file_content += "\t\thsl3.config = wrapper_node.config\n"
+        file_content += f"\twrapper_node = Hsl3WrapperNode(ROOT_DIR, json_file, logic_module)\n"
+        file_content += "\tif (wrapper_node.module is not None):\n"
+        file_content += "\t\thsl3.config = wrapper_node.module\n"
         file_content += "\n"
         file_content += self._set_inputs()
         file_content += "\n"
@@ -70,6 +81,6 @@ class TestfileParser:
 
         for input in self.config.inputs:
             input_value = '\"' + str(input.init_value) + '\"' if input.type.upper() == 'STRING' else input.init_value
-            file_content += f"\twrapper_node.set_input_value(\"{input.identifier}\", {input_value})\n"
+            file_content += f"\twrapper_node.set(\"{input.identifier}\", {input_value})\n"
 
         return file_content

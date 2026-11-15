@@ -3,9 +3,11 @@
 from typing import Callable, Union
 
 from .hsl3_debug_section import Hsl3DebugSection
+from .hsl3_logger import Hsl3Logger
 from .hsl3_slots import Hsl3Slots
 from .hsl3_generator.configs.dcls_module import ConfigModule
 import threading
+import logging
 
 class Hsl3Framework:
     """ 
@@ -185,7 +187,7 @@ class Hsl3Framework:
         else:
             raise ValueError(f"Timer with index or key '{index_or_key}' does not exist.")
 
-    def get_logger(self, host, port, console, level):
+    def get_logger(self, host="127.0.0.1", port=65002, console=False, level=logging.INFO):
         """Generates a logger with which log messages can be sent via Syslog. The HS-specific Syslog server can be reached at the address 127.0.0.1:65002.
         
         Parameters:
@@ -194,7 +196,7 @@ class Hsl3Framework:
          - console - Boolean indicating whether to also log to the console.
          - level - Logging level.
         """
-        print(f"Logger created: host={host}, port={port}, console={console}, level={level}")
+        return Hsl3Logger(self.name, host, port, console, level)
 
     def get_instance(self, instance_id):         
         """ Returns the instance of an HSL3 node. Parameters:

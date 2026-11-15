@@ -57,11 +57,6 @@ class Hsl3DebugSection:
          - name - Field name. If the field does not yet exist, the value is initialised with value.
          - value - If set, this value is accepted, otherwise current time stamp.
         """
-        if name not in self._fields:
-            self._fields[name] = 0
-        if not isinstance(self._fields[name], (float)):
-            raise TypeError("Field value must be a numerical value.")
-        
         self._fields[name] = value if value is not None else datetime.now().timestamp()
         
     def log(self, msg):

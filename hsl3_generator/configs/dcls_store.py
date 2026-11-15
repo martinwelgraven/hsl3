@@ -7,6 +7,7 @@ class StoreType(Enum):
     NUMBER = 1
     STRING = 2  # always bytes
 
+    # TODO: UPPER NEEDS TO BE REMOVED, ONLY TO TEMPORARILY SUPPORT ERROR FIXING
     def upper(self):
         return self.name
 
@@ -21,10 +22,6 @@ class ConfigStore:
     _next_id: int = field(default=1, init=False, repr=False)
     
     def __post_init__(self):
-        try:
-            self.index = ConfigStore._next_id
-            ConfigStore._next_id += 1
-            self.type = StoreType[self.type.upper()]
-        except KeyError:
-            print(f"Invalid store defined: '{self.label}' with type '{self.type}'\r\n")
-            exit()
+        self.index = ConfigStore._next_id
+        ConfigStore._next_id += 1
+        self.type = StoreType[self.type.upper()]
