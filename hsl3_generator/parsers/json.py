@@ -14,15 +14,8 @@ from hsl3.hsl3_generator.configs.dcls_translation import ConfigTranslation
 class JSONfileParser:
     """ Class for parsing the JSON configuration file for a logic module. """
 
-    def parse_json(self, filename):
-        if not os.path.exists(filename):
-            return
-        
-        content = ""
-        with open(filename, 'r', encoding='utf-8') as qf:
-            content = qf.read()
-
-        root = json.loads(content)
+    def parse_json(self, file_content):
+        root = json.loads(file_content)
         inputs = []
         outputs = []
         stores = []
@@ -80,19 +73,20 @@ class JSONfileParser:
 
         return ConfigModule(**root['module'])
 
-    def write_first_json(self, config: ConfigProject, category, context):
+    def write_first_json(self, config: ConfigProject):
+
         config_dict = {
             "module": {
                 "id": config.id,
-                "name": config.name,
+                "name": config.title,
                 "version": "0.1.0",
                 "version_date": datetime.now().strftime('%Y-%m-%d'),
                 "description": "This is a description for the module.",
                 "warning": "",
                 "note": "",
-                "category": category,
-                "context": context,
-                "hsl_filename": config.hsl_file,
+                "category": config.category,
+                "context": config.context,
+                "hsl_filename": config.node_file,
                 "inputs": [
                     {
                         "type": "string", 
@@ -120,13 +114,13 @@ class JSONfileParser:
                         "label": "Store 01",
                         "description": "This is a description for Store 01"
                     }
-                ],
+                ] if config.has_stores == True else [],
                 "timers": [
                     {
                         "identifier": "TIMER01",
                         "description": "This is a description for Timer 01"
                     }
-                ],
+                ] if config.has_timers == True else [],
                 "scripts": [
                     {
                         "filename": config.python_file
@@ -137,18 +131,10 @@ class JSONfileParser:
                         "language": "en",
                         "category": "",
                         "name": "English",
-                        "translation_inputs": [
-                            {   
-                                "label": "Input 01"
-                            }
-                        ],
-                        "translation_outputs": [
-                            {
-                                "label": "Output 01"
-                            }
-                        ]
+                        "translation_inputs": ["Input 01"],
+                        "translation_outputs": ["Output 01"]
                     }
-                ]
+                ] if config.has_translations == True else []
             }
         }
 

@@ -198,9 +198,11 @@ class ModuleParser:
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     imports.append(alias.name)
-            else:
-                if isinstance(node, ast.ImportFrom) and node.module:
-                        imports.append(node.module)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imports.append(node.module)
+                elif node.level:
+                    imports.extend(alias.name for alias in node.names if alias.name != '*')
         return imports
 
     def topological_sort(self, dependencies):
@@ -230,29 +232,36 @@ class ModuleParser:
         
         for script in module_config.scripts:
             print(f'Processing script file: {script}')
-            if hasattr(script, 'folder') and len(str(script.folder)) > 0:
-                for filename in os.listdir(os.path.join(str(self.base_path), str(script.folder))):
+            if script.folder:
+                folder = os.path.join(str(self.base_path), script.folder)
+                for filename in sorted(os.listdir(folder)):
                     if filename.startswith(script_prefix) and filename.endswith('.py'):
-                            script_files.append(filename)
-            if hasattr(script, 'filename') and len(str(script.filename)) > 0 and str(script.filename).startswith(script_prefix):
-                script_files.append(os.path.join(str(self.base_path), str(script.filename)))
+                        script_files.append(os.path.abspath(os.path.join(folder, filename)))
+            if script.filename and script.filename.startswith(script_prefix):
+                script_files.append(os.path.abspath(os.path.join(str(self.base_path), script.filename)))
         
         if len(script_files) == 0:
             raise Exception(f'No file with prefix {script_prefix} was found.')
         
-        else:
-            for script_file in script_files:
-                dependencies[script_file] = []
-                with open(script_file, 'r') as f:
-                    content = f.read()
-                    imports = self.extract_imports_ast(content)
-        
-                    for imp in imports:
-                        imp_file = imp.replace('.', '/') + '.py'
-                        if imp_file in script_files:
-                            dependencies[script_file].append(imp_file)
+        modules = {}
+        for script_file in script_files:
+            name = os.path.splitext(os.path.basename(script_file))[0]
+            if name in modules and modules[name] != script_file:
+                raise ValueError(f'Multiple scripts use module name {name}: {modules[name]}, {script_file}')
+            modules[name] = script_file
+
+        for name, script_file in modules.items():
+            dependencies[script_file] = []
+            with open(script_file, 'r', encoding='utf-8') as f:
+                imports = self.extract_imports_ast(f.read())
+            for imported_name in imports:
+                imported_file = modules.get(imported_name)
+                if imported_file and imported_file not in dependencies[script_file]:
+                    dependencies[script_file].append(imported_file)
+                    print(f'{name} imports {imported_name}')
         
         sorted_files = self.topological_sort(dependencies)
+        print('Script load order: ' + ', '.join(os.path.splitext(os.path.basename(path))[0] for path in sorted_files))
 
         for script_file in sorted_files:
             with open(script_file, 'r', encoding='utf-8') as script_src:

@@ -45,7 +45,10 @@ class Hsl3WrapperModule():
     def _open_config(self, source_file) -> ConfigModule:
         """ Helper function to open the config file and parse it into a ConfigModule object. """
 
-        config = JSONfileParser().parse_json(source_file)
+        config = None 
+        with open(source_file, "r", encoding="utf-8") as file:
+            config = JSONfileParser().parse_json(file.read())
+        
         if config == None:
             raise ValueError(f"Could not parse JSON configuration from file: {source_file}")
         
