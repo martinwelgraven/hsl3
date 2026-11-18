@@ -1,6 +1,7 @@
 import os
 import json
 from datetime import datetime
+from typing import Optional
 
 from hsl3.hsl3_generator.configs.dcls_module import ConfigModule
 from hsl3.hsl3_generator.configs.dcls_output import ConfigOutput
@@ -11,9 +12,11 @@ from hsl3.hsl3_generator.configs.dcls_timer import ConfigTimer
 from hsl3.hsl3_generator.configs.dcls_script import ConfigScript
 from hsl3.hsl3_generator.configs.dcls_translation import ConfigTranslation
 
+
 class JSONfileParser:
     """ Class for parsing the JSON configuration file for a logic module. """
 
+    
     def parse_json(self, file_content):
         root = json.loads(file_content)
         inputs = []
@@ -81,7 +84,7 @@ class JSONfileParser:
                 "name": config.title,
                 "version": "0.1.0",
                 "version_date": datetime.now().strftime('%Y-%m-%d'),
-                "description": "This is a description for the module.",
+                "description": "This is a description for the module. Use &lt;br&gt; for line breaks.",
                 "warning": "",
                 "note": "",
                 "category": config.category,
@@ -142,3 +145,56 @@ class JSONfileParser:
 
         with open(os.path.join(config.source_path, config.json_file), 'w', encoding='utf-8') as f:
             f.write(json_content)
+
+    def update_version(self, config: ConfigProject, version: str, version_date: str, note: Optional[str]):
+            path = os.path.join(config.source_path, config.json_file)
+            with open(path, 'r', encoding='utf-8', newline='') as f:
+                content = f.read()
+    
+            decoder = json.JSONDecoder()
+            root = json.loads(content)
+            if not isinstance(root, dict) or not isinstance(root.get('module'), dict):
+                raise ValueError("Invalid JSON format: 'module' must be an object.")
+    
+            def member_spans(start):
+                index = start + 1
+                members = {}
+                while True:
+                    while content[index].isspace():
+                        index += 1
+                    if content[index] == '}':
+                        return members
+                    key, index = decoder.raw_decode(content, index)
+                    while content[index].isspace():
+                        index += 1
+                    index += 1
+                    while content[index].isspace():
+                        index += 1
+                    value_start = index
+                    _, index = decoder.raw_decode(content, index)
+                    if key in members:
+                        raise ValueError(f"Duplicate JSON key: {key!r}")
+                    members[key] = (value_start, index)
+                    while content[index].isspace():
+                        index += 1
+                    if content[index] == ',':
+                        index += 1
+    
+            start = len(content) - len(content.lstrip())
+            root_members = member_spans(start)
+            module_start, _ = root_members['module']
+            members = member_spans(module_start)
+            changes = {'version': version, 'version_date': version_date}
+            if note is not None:
+                changes['note'] = note
+            replacements = []
+            for key, value in changes.items():
+                if key not in members:
+                    raise ValueError(f"Invalid JSON format: 'module.{key}' is missing.")
+                start, end = members[key]
+                replacements.append((start, end, json.dumps(value, ensure_ascii=True)))
+            for start, end, value in sorted(replacements, reverse=True):
+                content = content[:start] + value + content[end:]
+    
+            with open(path, 'w', encoding='utf-8', newline='') as f:
+                f.write(content)

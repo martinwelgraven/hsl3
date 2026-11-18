@@ -2,6 +2,7 @@ import os
 import re
 from dataclasses import dataclass, field
 import json
+import yaml
 from typing import Optional
 
 from hsl3.hsl3_generator.configs.dcls_module import ConfigModule
@@ -25,6 +26,7 @@ class ConfigProject:
     
     source_path: str = ''
     json_file: str = ''
+    yaml_file: str = ''
     html_file: str = ''
     python_file: str = ''
     node_file: str = ''
@@ -47,22 +49,32 @@ class ConfigProject:
             exit(1)
         else:
             self.source_path = os.path.join(self.root, 'src', 'hsl3_' + self.name.replace('-','_'))
-            self.json_file = f"config_{self.name.lower()}.json"
-            tmp_config = json.load(open(os.path.join(self.source_path, self.json_file))) if os.path.exists(os.path.join(self.source_path, self.json_file)) else None
-            if tmp_config:
-                mod = tmp_config.get('module', '')
-                self.id = mod.get('id', '')
+            self.json_file = f"config_{self.name.replace('-','_').lower()}.json"
+            self.yaml_file = f"config_{self.name.replace('-','_').lower()}.yaml"
                 
-            self.html_file = f"log{str(self.id)}.html"
             self.python_file = f"hsl3_{self.id}_{self.name.replace('-','_').lower()}.py"
             self.node_file = f"{self.id}_{self.name.replace('-','_').lower()}.hsl"
+            
             
             if not os.path.exists(self.source_path):
                 os.mkdir(self.source_path)
                 self.state = 'initialized'
-            elif not os.path.exists(os.path.join(self.source_path, self.json_file)):
+            elif not os.path.exists(os.path.join(self.source_path, self.json_file)) and not os.path.exists(os.path.join(self.source_path, self.yaml_file)):
                 self.state = 'initialized'
             else:
-                self.state = 'load'
-        
-        
+                tmp_config = None
+                if os.path.exists(os.path.join(self.source_path, self.json_file)):
+                    tmp_config = json.load(open(os.path.join(self.source_path, self.json_file)))
+                    self.yaml_file = ''
+                elif os.path.exists(os.path.join(self.source_path, self.yaml_file)):
+                    self.json_file = ''
+                    tmp_config = yaml.safe_load(open(os.path.join(self.source_path, self.yaml_file)))
+                
+                if tmp_config:
+                    mod = tmp_config.get('module', '')
+                    self.id = mod.get('id', '')
+                    self.html_file = f"log{str(self.id)}.html"
+                    
+                    self.state = 'load'
+                else:
+                    self.state = 'initialized'

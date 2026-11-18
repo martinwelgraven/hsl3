@@ -1,6 +1,6 @@
 global debug_mode
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 __author__ = 'Martin Welgraven'
 
 import os
@@ -40,7 +40,7 @@ def main():
     debug_mode = True
 
     debug('Debug mode is enabled.')
-    debug(f'Version: {__version__}')
+    debug(f'Generator version: {__version__}')
 
     project_config = ConfigProject(root=ROOT_DIR)
     project = ProjectParser(project_config, setup())
