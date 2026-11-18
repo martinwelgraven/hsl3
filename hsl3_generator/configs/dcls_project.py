@@ -52,7 +52,6 @@ class ConfigProject:
             self.json_file = f"config_{self.name.replace('-','_').lower()}.json"
             self.yaml_file = f"config_{self.name.replace('-','_').lower()}.yaml"
                 
-            self.html_file = f"log{str(self.id)}.html"
             self.python_file = f"hsl3_{self.id}_{self.name.replace('-','_').lower()}.py"
             self.node_file = f"{self.id}_{self.name.replace('-','_').lower()}.hsl"
             
@@ -74,6 +73,7 @@ class ConfigProject:
                 if tmp_config:
                     mod = tmp_config.get('module', '')
                     self.id = mod.get('id', '')
+                    self.html_file = f"log{str(self.id)}.html"
                     
                     self.state = 'load'
                 else:
