@@ -4,6 +4,7 @@ from .hsl3_slots import Hsl3Slots
 from .hsl3_base_module import LogicModule
 from .hsl3_generator.configs.dcls_module import ConfigModule
 from .hsl3_generator.parsers.json import JSONfileParser
+from .hsl3_generator.parsers.yaml import YAMLfileParser
 
 
 class Hsl3WrapperModule():
@@ -12,9 +13,9 @@ class Hsl3WrapperModule():
     This class is not part of the official HSL3 documentation.
     """
 
-    def __init__(self, json_file: str, node: LogicModule) -> None:
+    def __init__(self, config_file: str, node: LogicModule) -> None:
         self.node = node
-        self.config: ConfigModule = self._open_config(json_file)
+        self.config: ConfigModule = self._open_config(config_file)
      
         self.node.fw.inputs = Hsl3Slots("inputs")
         self.node.fw.outputs = Hsl3Slots("outputs")
@@ -46,8 +47,14 @@ class Hsl3WrapperModule():
         """ Helper function to open the config file and parse it into a ConfigModule object. """
 
         config = None 
-        with open(source_file, "r", encoding="utf-8") as file:
-            config = JSONfileParser().parse_json(file.read())
+        if source_file.endswith(".json"):
+            with open(source_file, "r", encoding="utf-8") as file:
+                config = JSONfileParser().parse_json(file.read())
+        elif source_file.endswith(".yaml"):
+            with open(source_file, "r", encoding="utf-8") as file:
+                config = YAMLfileParser().parse_yaml(file.read())
+        else:
+            raise ValueError(f"Unsupported configuration file format: {source_file}")
         
         if config == None:
             raise ValueError(f"Could not parse JSON configuration from file: {source_file}")
