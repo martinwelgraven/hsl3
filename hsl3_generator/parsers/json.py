@@ -1,7 +1,9 @@
 import os
 import json
-from datetime import datetime
+from dataclasses import asdict
+from datetime import date
 from typing import Optional
+from enum import Enum
 
 from hsl3.hsl3_generator.configs.dcls_module import ConfigModule
 from hsl3.hsl3_generator.configs.dcls_output import ConfigOutput
@@ -10,7 +12,25 @@ from hsl3.hsl3_generator.configs.dcls_project import ConfigProject
 from hsl3.hsl3_generator.configs.dcls_store import ConfigStore
 from hsl3.hsl3_generator.configs.dcls_timer import ConfigTimer
 from hsl3.hsl3_generator.configs.dcls_script import ConfigScript
-from hsl3.hsl3_generator.configs.dcls_translation import ConfigTranslation
+from hsl3.hsl3_generator.configs.dcls_translation import ConfigTranslation, ConfigTranslationOutput, ConfigTranslationInput
+
+
+def _to_json_value(value):
+    """Convert complex objects to JSON-serializable primitives.
+    
+    Handles: Enums (convert to name), dates (to ISO format), and nested structures.
+    """
+    if isinstance(value, Enum):
+        return value.name
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        return value.decode('utf-8', errors='replace')
+    if isinstance(value, dict):
+        return {key: _to_json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_json_value(item) for item in value]
+    return value
 
 
 class JSONfileParser:
@@ -28,44 +48,76 @@ class JSONfileParser:
         translations = []
         
         for elem in root['module']['inputs']:
-            list_item = ConfigInput(**elem)
+            list_item = ConfigInput(
+                label=elem['label'],
+                type=elem['type'],
+                init_value=elem['init_value'],
+                identifier=elem.get('identifier', ''),
+                description=elem.get('description', '')
+            )
             inputs.append(list_item)
         
         for elem in root['module']['outputs']:
-            list_item = ConfigOutput(**elem)
+            list_item = ConfigOutput(
+                label=elem['label'],
+                type=elem['type'],
+                init_value=elem['init_value'],
+                identifier=elem.get('identifier', ''),
+                description=elem.get('description', '')
+            )
             outputs.append(list_item)
         
         if 'stores' in root['module']:
             for elem in root['module']['stores']:
-                list_item = ConfigStore(**elem)
+                list_item = ConfigStore(
+                    type=elem['type'],
+                    init_value=elem['init_value'],
+                    identifier=elem.get('identifier', ''),
+                    description=elem.get('description', '')
+                )
                 stores.append(list_item)
         
         if 'timers' in root['module']:
             for elem in root['module']['timers']:
-                list_item = ConfigTimer(**elem)
+                list_item = ConfigTimer(
+                    identifier=elem.get('identifier', ''),
+                    description=elem.get('description', '') 
+                )
                 timers.append(list_item)
         
         for elem in root['module']['scripts']:
-            list_item = ConfigScript(**elem)
+            list_item = ConfigScript(
+                filename=elem.get('filename', ''),
+                folder=elem.get('folder', '')
+            )
             scripts.append(list_item)
         
         if 'translations' in root['module']:
             for elem in root['module']['translations']:
                 translation_inputs = []
-                
                 for ti in elem['translation_inputs']:
-                    translation_inputs.append(ti['label'])
+                    translation_input = ConfigTranslationInput(
+                        label=ti['label']
+                    )
+                    translation_inputs.append(translation_input)
+
+
                 translation_outputs = []
-                
                 for to in elem['translation_outputs']:
-                    translation_outputs.append(to['label'])
-                
-                elem_dict = dict(elem)
-                elem_dict['translation_inputs'] = translation_inputs
-                elem_dict['translation_outputs'] = translation_outputs
-                
-                list_item = ConfigTranslation(**elem_dict)
-                translations.append(list_item)
+                    translation_output = ConfigTranslationOutput(
+                        label=to['label']
+                    )
+                    translation_outputs.append(translation_output)
+
+                translation = ConfigTranslation(
+                    category=elem.get('category', ''),
+                    language=elem.get('language', ''),
+                    name=elem.get('name', ''),
+                    translation_inputs=translation_inputs,
+                    translation_outputs=translation_outputs
+                )
+
+                translations.append(translation)
         
         root['module']['inputs'] = inputs
         root['module']['outputs'] = outputs
@@ -76,125 +128,47 @@ class JSONfileParser:
 
         return ConfigModule(**root['module'])
 
-    def write_first_json(self, config: ConfigProject):
 
-        config_dict = {
-            "module": {
-                "id": config.id,
-                "name": config.title,
-                "version": "0.1.0",
-                "version_date": datetime.now().strftime('%Y-%m-%d'),
-                "description": "This is a description for the module. Use &lt;br&gt; for line breaks.",
-                "warning": "",
-                "note": "",
-                "category": config.category,
-                "context": config.context,
-                "hsl_filename": config.node_file,
-                "inputs": [
-                    {
-                        "type": "string", 
-                        "identifier": "IN01", 
-                        "init_value": "", 
-                        "label": "Input 01",
-                        "description": "This is a description for Input 01"
-                    }
-                ],
-                "outputs": [
-                    {
-                        "type": "string", 
-                        "identifier": "OUT01", 
-                        "init_value": "", 
-                        "sbc": "s",
-                        "label": "Output 01",
-                        "description": "This is a description for Output 01"
-                    }
-                ],
-                "stores": [
-                    {
-                        "identifier": "STORE01",
-                        "type": "string",
-                        "init_value": "",
-                        "label": "Store 01",
-                        "description": "This is a description for Store 01"
-                    }
-                ] if config.has_stores == True else [],
-                "timers": [
-                    {
-                        "identifier": "TIMER01",
-                        "description": "This is a description for Timer 01"
-                    }
-                ] if config.has_timers == True else [],
-                "scripts": [
-                    {
-                        "filename": config.python_file
-                    }
-                ],
-                "translations": [
-                    {
-                        "language": "en",
-                        "category": "",
-                        "name": "English",
-                        "translation_inputs": ["Input 01"],
-                        "translation_outputs": ["Output 01"]
-                    }
-                ] if config.has_translations == True else []
-            }
-        }
+    def unparse_json(self, node_config: ConfigModule) -> dict:
+        def without_private_elements(value):
+            if isinstance(value, dict):
+                return {
+                    key: without_private_elements(item)
+                    for key, item in value.items()
+                    if not key.startswith('_')
+                }
+            if isinstance(value, list):
+                return [without_private_elements(item) for item in value]
+            return value
 
-        json_content = json.dumps(config_dict, indent=4, ensure_ascii=True)
+        module = without_private_elements(asdict(node_config))
+        # Convert Enums, dates, and bytes to JSON-serializable values
+        module = _to_json_value(module)
+        return {'module': module}
 
-        with open(os.path.join(config.source_path, config.json_file), 'w', encoding='utf-8') as f:
-            f.write(json_content)
+    def write_json(self, project_config: ConfigProject, node_config: ConfigModule):
+        with open(os.path.join(project_config.source_path, project_config.json_file), 'w', encoding='utf-8') as f:
+            json.dump(self.unparse_json(node_config), f, default=str, indent=4, ensure_ascii=False)
 
-    def update_version(self, config: ConfigProject, version: str, version_date: str, note: Optional[str]):
-            path = os.path.join(config.source_path, config.json_file)
-            with open(path, 'r', encoding='utf-8', newline='') as f:
-                content = f.read()
-    
-            decoder = json.JSONDecoder()
-            root = json.loads(content)
-            if not isinstance(root, dict) or not isinstance(root.get('module'), dict):
-                raise ValueError("Invalid JSON format: 'module' must be an object.")
-    
-            def member_spans(start):
-                index = start + 1
-                members = {}
-                while True:
-                    while content[index].isspace():
-                        index += 1
-                    if content[index] == '}':
-                        return members
-                    key, index = decoder.raw_decode(content, index)
-                    while content[index].isspace():
-                        index += 1
-                    index += 1
-                    while content[index].isspace():
-                        index += 1
-                    value_start = index
-                    _, index = decoder.raw_decode(content, index)
-                    if key in members:
-                        raise ValueError(f"Duplicate JSON key: {key!r}")
-                    members[key] = (value_start, index)
-                    while content[index].isspace():
-                        index += 1
-                    if content[index] == ',':
-                        index += 1
-    
-            start = len(content) - len(content.lstrip())
-            root_members = member_spans(start)
-            module_start, _ = root_members['module']
-            members = member_spans(module_start)
-            changes = {'version': version, 'version_date': version_date}
-            if note is not None:
-                changes['note'] = note
-            replacements = []
-            for key, value in changes.items():
-                if key not in members:
-                    raise ValueError(f"Invalid JSON format: 'module.{key}' is missing.")
-                start, end = members[key]
-                replacements.append((start, end, json.dumps(value, ensure_ascii=True)))
-            for start, end, value in sorted(replacements, reverse=True):
-                content = content[:start] + value + content[end:]
-    
-            with open(path, 'w', encoding='utf-8', newline='') as f:
-                f.write(content)
+    def open_json(self, project_config: ConfigProject) -> dict:
+        path = os.path.join(project_config.source_path, project_config.json_file)
+        with open(path, 'r', encoding='utf-8', newline='') as f:
+            content = f.read()
+
+        expected: dict = json.loads(content)
+        if not isinstance(expected, dict):
+            raise ValueError("Invalid JSON format: expected a mapping at the root.")
+        elif 'module' not in expected.keys():
+            raise ValueError("Invalid JSON format: expected at least one key.")
+        else:
+            return expected
+
+    def update_version(self, project_config: ConfigProject, version: str, version_date: str, note: Optional[str]):
+            
+        node_config = self.open_json(project_config)
+        node_config['module']['version'] = version
+        node_config['module']['version_date'] = date.fromisoformat(version_date)
+        if note is not None:
+            node_config['module']['note'] = note
+
+        self.write_json(project_config, ConfigModule(**node_config['module']))

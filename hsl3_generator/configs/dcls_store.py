@@ -13,7 +13,6 @@ class StoreType(Enum):
 
 @dataclass
 class ConfigStore:
-    label: str
     init_value: Union[bytes, float]
     type: StoreType
     index: int = field(init=False)

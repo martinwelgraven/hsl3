@@ -24,13 +24,19 @@ def setup():
     parser.add_argument('-n', '--new', action='store_true', help='Triggers a series of questions to create a new project')
     parser.add_argument('-b', '--build', action='store_true', help='Triggers a series of questions to build the project to a HSL file and generate the documentation')
     parser.add_argument('-d', '--debug', action='store_true', help='Enables debug output')
-    
+    parser.add_argument('--toyaml', action='store_true', help='Converts the config file to YAML')
+    parser.add_argument('--tojson', action='store_true', help='Converts the config file to JSON')
+            
     args = parser.parse_args()
 
     if args.new == True:
         return 'new'
     elif args.build == True:
         return 'build'
+    elif args.toyaml == True:
+        return 'toyaml'
+    elif args.tojson == True:
+        return 'tojson'
     else:
         print("No valid action provided. Please use '-n/--new' to create a new project or '-b/--build' to build the project.")
         exit(1)
